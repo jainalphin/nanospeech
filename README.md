@@ -17,8 +17,16 @@ There are two single-file implementations, one in [PyTorch](./nanospeech/nanospe
 ## Quick Start
 
 ```bash
-pip install nanospeech
+pip install -U nanospeech
 ```
+
+To include MLX support, install it like:
+
+```bash
+pip install -U nanospeech[mlx]
+```
+
+To generate speech:
 
 ```bash
 python -m nanospeech.generate --text "The quick brown fox jumps over the lazy dog."
