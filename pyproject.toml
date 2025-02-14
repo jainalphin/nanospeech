@@ -6,7 +6,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "nanospeech"
-version = "0.0.4"
+version = "0.0.5"
 authors = [{name = "Lucas Newman", email = "lucasnewman@me.com"}]
 license = {text = "MIT"}
 description = "Simple, hackable text-to-speech with PyTorch or MLX."
@@ -33,7 +33,6 @@ dependencies = [
     "einx",
     "ema-pytorch",
     "huggingface_hub",
-    "mlx",
     "numpy",
     "safetensors",
     "setuptools",
@@ -42,8 +41,7 @@ dependencies = [
     "tqdm",
     "torch",
     "torchaudio",
-    "vocos",
-    "vocos-mlx"
+    "vocos"
 ]
 
 [project.urls]
@@ -57,6 +55,7 @@ nanospeech = ["voices/*.wav", "voices/*.txt"]
 
 [dependency-groups]
 dev = ["gradio>=5.15.0"]
+mlx = ["mlx", "vocos-mlx"]
 
 [project.scripts]
 nanospeech = "nanospeech.generate:main"
