@@ -1,6 +1,8 @@
 # Training a Text-to-Speech Model from Scratch
 
-In this guide, we'll show how you can use the LibriTTS-R dataset and Nanospeech to train your own text-to-speech model from scratch.
+[Nanospeech](https://github.com/lucasnewman/nanospeech) is a simple, hackable text-to-speech system in PyTorch and MLX.
+
+This guide will show you how to use Nanospeech and the LibriTTS-R dataset to train your own text-to-speech model from scratch.
 
 ## Requirements
 
@@ -10,20 +12,21 @@ In this guide, we'll show how you can use the LibriTTS-R dataset and Nanospeech 
 
 ## Table of contents
 
-- [Step 1: Preparing the dataset](#step-1-preparing-the-dataset)
-- [Step 2: Training the speech model](#step-2-training-the-speech-model)
-- [Step 3: Training the duration prediction model](#step-3-training-the-duration-prediction-model) [Coming soon]
-- [Step 4: Generating speech](#step-4-generating-speech) [Coming soon]
+1) [Preparing the dataset](#step-1-preparing-the-dataset)
+2) [Training the speech generation model](#step-2-training-the-speech-generation-model)
+3) [Training the duration prediction model](#step-3-training-the-duration-prediction-model)
+4) [Generating speech](#step-4-generating-speech)
+5) [Further experimentation ideas](#step-5-further-experimentation-ideas)
 
 ## Step 1: Preparing the dataset
 
 LibriTTS-R is a dataset with paired speech and text transcriptions with around 580 hours of audio. The dataset is well-suited for text-to-speech experiments because it provides clean, high-quality audio sampled at 24kHz, with speech split along sentence breaks and each sample under 30 seconds.
 
-To prepare for training, we want to process the original dataset into a WebDataset that will allow us to stream samples from the network immediately, without any additional downloads or processing on our GPU node.
+Before training, we’ll process the original dataset into a WebDataset. This format allows us to stream samples directly from storage, reducing the need for extra downloads or preprocessing on the GPU node.
 
 *Note: If you'd like to skip this step, there's a prepared dataset available on [Hugging Face](https://huggingface.co/datasets/lucasnewman/libritts-r-webdataset).*
 
-### Download the clean splits
+### Downloading the clean splits
 
 The first thing we need to do is to download the clean splits from the dataset on [OpenSLR](https://www.openslr.org/141/).
 
@@ -40,12 +43,12 @@ rm dev_clean.tar.gz train_clean_100.tar.gz train_clean_360.tar.gz
 
 ### Preprocessing
 
-Once we have the data, we'll do the following preprocessing:
+Once we have the data, we’ll preprocess it by:
 
-- Convert the audio into 64kbps MP3 files, which will make the dataset about 80% smaller with minimal quality loss.
-- Convert the transcriptions and audio duration into a JSON metadata file.
-- Create .tar files containing the samples, split into shards of 1000 examples.
-- Create a vocabulary from each character in the transcriptions, so we can tokenize them.
+- Converting the audio into 64kbps MP3 files, which will make the dataset about 80% smaller with minimal quality loss.
+- Converting the transcriptions and audio duration into a JSON metadata file.
+- Creating .tar files containing the samples, split into shards of 1000 examples.
+- Creating a vocabulary from each character in the transcriptions, so we can tokenize them.
 
 ###
 
@@ -169,9 +172,9 @@ This should run relatively quickly as we avoid loading any audio files into memo
 
 Now that we've preprocessed the dataset, we can upload it to an hosting provider like Hugging Face or Amazon S3.
 
-## Step 2: Training the speech model
+## Step 2: Training the speech generation model
 
-Now that we have our dataset, we're ready to train the model. Let's prepare our Python environment on the GPU node by installing Nanospeech and all the required dependencies:
+Now that we have our dataset, we're ready to train the model. First, install Nanospeech and its dependencies on the GPU node:
 
 ```sh
 pip install nanospeech
@@ -291,12 +294,151 @@ After a short delay to load the dataset metadata and initial samples, we should 
 
 ![Training loss](./loss.png)
 
-The training will take a few days to complete, so we'll just let it run.
+The training will take a few days to complete, so we'll just let it run until we reach 1M steps, and then save the final checkpoint.
 
 ## Step 3: Training the duration prediction model
 
-[Coming soon]
+The duration prediction model takes a reference speech sample and its transcription, along with the new text to be synthesized, and predicts the duration of the generated speech. We'll use as an input into the speech generation pipeline.
+
+The training setup for the duration prediction model is very similar to the speech generation model, except that the output of the network is the predicted duration instead of a generated waveform.
+
+Since the model predicts only a single value, it can be smaller and omit the timestep embeddings used in the speech generation model.
+
+Let's write a python script to handle it in `train_duration.py`:
+
+```python
+from functools import partial
+from torch.optim import AdamW
+from datasets import load_dataset
+
+from nanospeech.nanospeech_torch import (
+    DurationPredictor,
+    DurationTransformer,
+    list_str_to_vocab_tensor,
+    SAMPLES_PER_SECOND
+)
+from nanospeech.trainer_torch import DurationTrainer
+
+
+def train():
+    # using our same vocab-based tokenizer
+
+    with open("vocab.txt", "r") as f:
+        vocab = {v: i for i, v in enumerate(f.read().splitlines())}
+    tokenizer = partial(list_str_to_vocab_tensor, vocab=vocab)
+    text_num_embeds = len(vocab)
+
+    # set up the model -- we'll use a shallower model since the objective is simpler
+
+    model = DurationPredictor(
+        transformer=DurationTransformer(
+            dim=512,
+            depth=8,
+            heads=8,
+            text_dim=512,
+            ff_mult=2,
+            conv_layers=4,
+            text_num_embeds=text_num_embeds,
+        ),
+        tokenizer=tokenizer,
+    )
+
+    print(f"Trainable parameters: {sum(p.numel() for p in model.parameters() if p.requires_grad):,}")
+
+    # configure an optimizer
+
+    optimizer = AdamW(model.parameters(), lr=1e-4)
+
+    # set up the trainer
+
+    trainer = DurationTrainer(
+        model,
+        optimizer,
+        num_warmup_steps=1000,
+        accelerate_kwargs={
+            "mixed_precision": "bf16",
+            "log_with": "wandb",  # if you're using wandb logging
+        },
+    )
+
+    # load the same dataset we prepared in step 1
+
+    dataset = load_dataset(
+        "lucasnewman/libritts-r-webdataset",
+        split="train",
+        streaming=True  # configure the dataset for streaming for instant start
+    )
+
+    # configure the batch size based on available GPU memory
+
+    batch_size = 112
+    max_duration_sec = 10
+    max_duration = int(max_duration_sec * SAMPLES_PER_SECOND)
+    max_batch_frames = int(batch_size * max_duration)
+
+    # train for 250k steps
+
+    total_steps = 250_000
+
+    trainer.train(
+        dataset,
+        total_steps,
+        batch_size=batch_size,
+        max_batch_frames=max_batch_frames,
+        max_duration=max_duration,
+        num_workers=8,
+        save_step=10_000,
+    )
+
+# start training
+
+train()
+```
+
+Training the duration prediction model requires less compute than the speech generation model, so you may be able to use a larger batch size and fewer training steps.
+
+Once we've finished training the duration prediction model, we're ready to generate speech — let's give it a shot.
 
 ## Step 4: Generating speech
 
-[Coming soon]
+To start generating speech, we'll take the three key pieces that we've produced and upload them to a Hugging Face model repository.
+
+Nanospeech uses the [safetensors](https://huggingface.co/docs/safetensors/convert-weights) format for model storage, which is widely used and portable between machine learning frameworks like PyTorch and MLX.
+
+After converting the model weights to the safetensors format, we'll upload these files:
+
+- The speech generation model: `model.safetensors`
+- The duration prediction model: `duration.safetensors`
+- The vocabulary we created for tokenization: `vocab.txt`
+
+See the [pretrained model repository](https://huggingface.co/lucasnewman/nanospeech/tree/main) on Hugging Face for an example.
+
+Now we can invoke Nanospeech with our custom model:
+
+```sh
+python -m nanospeech.generate \
+--model <hf_model_repo_id>
+--text "I was trained from scratch in just a few days."
+```
+
+This should produce output similar to [this sample](https://s3.amazonaws.com/lucasnewman.datasets/nanospeech/tutorial/sample.wav) and visualizing the generated waveform will look similar to this:
+
+![speech waveform](waveform.png)
+
+## Step 5: Further experimentation ideas
+
+The Nanospeech code is intentionally designed to be scalable and hackable, and there are many directions we could go from here, such as:
+
+- Training on longer samples for better long-form generation
+
+- Tuning hyperparameters for more effective training
+
+- Training on much larger and/or multilingual datasets, like [Emilia](https://huggingface.co/datasets/amphion/Emilia-Dataset)
+
+- Scaling to a larger model using [muP](https://github.com/microsoft/mup) to optimize hyperparameter transfer
+
+- Experimenting with different choices of optimizers, e.g. Muon, ADOPT, or MARS
+
+- Extending the dataset and model architecture to guide generation with e.g. emotional expression or non-verbal utterances
+
+Share your ideas or ask questions in the [discussions](https://github.com/lucasnewman/nanospeech/discussions) section!
