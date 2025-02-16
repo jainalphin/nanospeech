@@ -298,7 +298,7 @@ The training will take a few days to complete, so we'll just let it run until we
 
 ## Step 3: Training the duration prediction model
 
-The duration prediction model takes a reference speech sample and its transcription, along with the new text to be synthesized, and predicts the duration of the generated speech. We'll use as an input into the speech generation pipeline.
+The duration prediction model takes a reference speech sample and its transcription, along with the new text to be synthesized, and predicts the duration of the generated speech. We'll use the predicted duration as an input into the speech generation pipeline.
 
 The training setup for the duration prediction model is very similar to the speech generation model, except that the output of the network is the predicted duration instead of a generated waveform.
 
