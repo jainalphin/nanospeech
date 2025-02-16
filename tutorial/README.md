@@ -12,8 +12,8 @@ In this guide, we'll show how you can use the LibriTTS-R dataset and Nanospeech 
 
 - [Step 1: Preparing the dataset](#step-1-preparing-the-dataset)
 - [Step 2: Training the speech model](#step-2-training-the-speech-model)
-- [Step 3: Training the duration prediction model](#step-3-training-the-duration-prediction-model)
-- [Step 4: Generating speech](#step-4-generating-speech)
+- [Step 3: Training the duration prediction model](#step-3-training-the-duration-prediction-model) [Coming soon]
+- [Step 4: Generating speech](#step-4-generating-speech) [Coming soon]
 
 ## Step 1: Preparing the dataset
 
