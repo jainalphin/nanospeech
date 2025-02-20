@@ -58,7 +58,7 @@ Nanospeech includes a PyTorch-based trainer using Accelerate, and is compatible 
 
 It supports streaming from any [WebDataset](https://github.com/webdataset/webdataset), but it should be straightforward to swap in your own dataloader as well. An ideal dataset consists of high-quality speech paired with clean transcriptions.
 
-See the [tutorial](./tutorial/) for an example of training both the base model and the duration predictor on the LibriTTS-R dataset.
+See the [guide](./tutorial/) for an example of training both the base model and the duration predictor on the LibriTTS-R dataset.
 
 ## Limitations
 
