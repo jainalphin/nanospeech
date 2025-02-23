@@ -87,15 +87,6 @@ However, the underlying architecture should scale up well to significantly more 
 ```
 
 ```bibtex
-@article{chen-etal-2024-f5tts,
-    title     = {F5-TTS: A Fairytaler that Fakes Fluent and Faithful Speech with Flow Matching}, 
-    author    = {Yushen Chen and Zhikang Niu and Ziyang Ma and Keqi Deng and Chunhui Wang and Jian Zhao and Kai Yu and Xie Chen},
-    year      = {2024},
-    url       = {https://api.semanticscholar.org/CorpusID:273228169}
-}
-```
-
-```bibtex
 @inproceedings{Eskimez2024E2TE,
     title     = {E2 TTS: Embarrassingly Easy Fully Non-Autoregressive Zero-Shot TTS},
     author    = {Sefik Emre Eskimez and Xiaofei Wang and Manthan Thakker and Canrun Li and Chung-Hsien Tsai and Zhen Xiao and Hemin Yang and Zirun Zhu and Min Tang and Xu Tan and Yanqing Liu and Sheng Zhao and Naoyuki Kanda},
