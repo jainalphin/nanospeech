@@ -1011,7 +1011,8 @@ class Nanospeech(nn.Module):
         inp: float["b n d"] | float["b nw"],  # mel or raw wave  # noqa: F722
         text: int["b nt"] | list[str],  # noqa: F722
         *,
-        lens: int["b"] | None = None,  # noqa: F821
+        lens: int["b"] | None = None,  # noqa: F821,
+        ema_model: Nanospeech | None = None,  # noqa: F821
     ):
         # handle raw wave
 
@@ -1070,11 +1071,17 @@ class Nanospeech(nn.Module):
 
         # transformer and cfg training with a drop rate
 
-        rand_audio_drop = torch.rand(1, device=device)
-        rand_cond_drop = torch.rand(1, device=device)
-        drop_audio_cond = rand_audio_drop < self.audio_drop_prob
-        drop_text = rand_cond_drop < self.cond_drop_prob
-        drop_audio_cond = drop_audio_cond | drop_text
+        use_mg_loss = exists(ema_model)
+
+        if not use_mg_loss:
+            rand_audio_drop = torch.rand(1, device=device)
+            rand_cond_drop = torch.rand(1, device=device)
+            drop_audio_cond = rand_audio_drop < self.audio_drop_prob
+            drop_text = rand_cond_drop < self.cond_drop_prob
+            drop_audio_cond = drop_audio_cond | drop_text
+        else:
+            drop_text = False
+            drop_audio_cond = False
 
         pred = self.transformer(
             x=w,
@@ -1085,6 +1092,34 @@ class Nanospeech(nn.Module):
             drop_text=drop_text,
             mask=mask,
         )
+
+        # Model-guidance loss to avoid classifier-free guidance, arXiv:2502.12154
+
+        if use_mg_loss:
+            with torch.no_grad():
+                guidance_cond = ema_model.ema_model.transformer(
+                    x=w,
+                    cond=cond,
+                    text=text,
+                    time=time,
+                    drop_audio_cond=False,
+                    drop_text=False,
+                    mask=mask,
+                )
+
+                guidance_uncond = ema_model.ema_model.transformer(
+                    x=w,
+                    cond=cond,
+                    text=text,
+                    time=time,
+                    drop_audio_cond=True,
+                    drop_text=True,
+                    mask=mask,
+                )
+
+                guidance_scale = torch.where(t < 0.75, 0.5, 0)
+                guidance = (guidance_cond - guidance_uncond) * guidance_scale
+                flow = flow + guidance
 
         # flow matching loss
 
@@ -1121,7 +1156,7 @@ class Nanospeech(nn.Module):
         max_duration=4096,
     ):
         self.eval()
-        
+
         cond = torch.Tensor(cond).to(self.device)
 
         if next(self.parameters()).dtype == torch.float16:
@@ -1221,7 +1256,7 @@ class Nanospeech(nn.Module):
             odeint_fn = odeint_euler
         elif ode_method == "rk4":
             odeint_fn = odeint_rk4
-        elif ode_method == "rk4":
+        elif ode_method == "midpoint":
             odeint_fn = odeint_midpoint
         else:
             raise ValueError(f"Unknown method: {ode_method}")
@@ -1242,13 +1277,13 @@ class Nanospeech(nn.Module):
         trajectory = odeint_fn(fn, y0, t)
 
         sampled = trajectory[-1]
-        
+
         # trim the reference audio
-        
+
         out = sampled[:, cond_seq_len:]
 
         # vocode to a waveform
-        
+
         if exists(self.vocoder):
             out = out.permute(0, 2, 1)
             out = self.vocoder(out.cpu())

@@ -127,6 +127,7 @@ class NanospeechTrainer:
         num_warmup_steps=2_000,
         max_grad_norm=1.0,
         sample_rate=24_000,
+        use_mg_loss=False,
         accelerate_kwargs: dict = dict(),
         ema_kwargs: dict = dict(),
     ):
@@ -142,6 +143,8 @@ class NanospeechTrainer:
         self.model = model
         self.optimizer = optimizer
         self.num_warmup_steps = num_warmup_steps
+        self.use_mg_loss = use_mg_loss
+
         self.mel_spectrogram = MelSpec()
 
         self.ema_model = EMA(model, include_online_model=False, **ema_kwargs)
@@ -276,7 +279,14 @@ class NanospeechTrainer:
                     audio_lengths = (audio_lengths / HOP_LENGTH).long()
 
                     with torch.autocast(device_type=self.accelerator.device.type, dtype=torch.bfloat16):
-                        loss = self.model(audio, text=text, lens=audio_lengths)
+                        ema_model = self.ema_model if self.use_mg_loss else None
+                        
+                        loss = self.model(
+                            audio,
+                            text=text,
+                            lens=audio_lengths,
+                            ema_model=ema_model,
+                        )
 
                     self.accelerator.backward(loss)
 

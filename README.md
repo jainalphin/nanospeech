@@ -69,11 +69,29 @@ However, the underlying architecture should scale up well to significantly more 
 ## Citations
 
 ```bibtex
+@article{tang2025diffusion,
+    title     = {Diffusion Models without Classifier-free Guidance},
+    author    = {Tang, Zhicong and Bao, Jianmin and Chen, Dong and Guo, Baining},
+    year      = {2025},
+    url       = {https://api.semanticscholar.org/CorpusID:276421312}
+}
+```
+
+```bibtex
 @article{chen-etal-2024-f5tts,
-      title     = {F5-TTS: A Fairytaler that Fakes Fluent and Faithful Speech with Flow Matching}, 
-      author    = {Yushen Chen and Zhikang Niu and Ziyang Ma and Keqi Deng and Chunhui Wang and Jian Zhao and Kai Yu and Xie Chen},
-      year      = {2024},
-      url       = {https://api.semanticscholar.org/CorpusID:273228169}
+    title     = {F5-TTS: A Fairytaler that Fakes Fluent and Faithful Speech with Flow Matching}, 
+    author    = {Yushen Chen and Zhikang Niu and Ziyang Ma and Keqi Deng and Chunhui Wang and Jian Zhao and Kai Yu and Xie Chen},
+    year      = {2024},
+    url       = {https://api.semanticscholar.org/CorpusID:273228169}
+}
+```
+
+```bibtex
+@article{chen-etal-2024-f5tts,
+    title     = {F5-TTS: A Fairytaler that Fakes Fluent and Faithful Speech with Flow Matching}, 
+    author    = {Yushen Chen and Zhikang Niu and Ziyang Ma and Keqi Deng and Chunhui Wang and Jian Zhao and Kai Yu and Xie Chen},
+    year      = {2024},
+    url       = {https://api.semanticscholar.org/CorpusID:273228169}
 }
 ```
 
