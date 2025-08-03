@@ -403,7 +403,28 @@ Once we've finished training the duration prediction model, we're ready to gener
 
 To start generating speech, we'll take the three key pieces that we've produced and upload them to a Hugging Face model repository.
 
-Nanospeech uses the [safetensors](https://huggingface.co/docs/safetensors/convert-weights) format for model storage, which is widely used and portable between machine learning frameworks like PyTorch and MLX.
+Nanospeech uses the **safetensors** format for model storage, which is widely used and portable between machine learning frameworks like PyTorch and MLX.
+
+To convert a PyTorch checkpoint (.pt) to .safetensors, you can use the following helper function:
+
+```commandline
+def convert_to_safetensors(pt_path: Path, output_path: Path) -> None:
+    checkpoint = torch.load(pt_path, map_location="cpu")
+
+    if isinstance(checkpoint, dict):
+        state_dict = (
+            checkpoint.get("model_state_dict")
+            or checkpoint.get("state_dict")
+            or checkpoint
+        )
+    else:
+        raise ValueError(f"Unexpected checkpoint format: {type(checkpoint)}")
+
+    tensors = {k: v.cpu() for k, v in state_dict.items() if isinstance(v, torch.Tensor)}
+    output_path.parent.mkdir(parents=True, exist_ok=True)
+    save_file(tensors, output_path)
+```
+
 
 After converting the model weights to the safetensors format, we'll upload these files:
 
